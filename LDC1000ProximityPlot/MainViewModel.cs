@@ -27,16 +27,12 @@ namespace LDC1000ProximityPlot
         //some of these shouldn't be global...reorganize
 
         private ICommand _readCommand;
-        private readonly Stopwatch watch = new Stopwatch();
-        public Timer MainTimer;
+        
         int count = 0;
-        long Proximity;
-
+        int Proximity;
         int dataLength;
-        byte[] data;
+        byte[] data = new byte[4];
         int i = 0;
-        int j = 0;
-        int k = 0;
 
         LineSeries MainSeries { get; set; }
         public SerialPort evm { get; set; }
@@ -74,7 +70,7 @@ namespace LDC1000ProximityPlot
             // Create the plot model
             var tmp = new PlotModel { Title = "Proximity" };
             // Create two line series (markers are hidden by default)
-            MainSeries = new LineSeries { Title = "Data", MarkerType = MarkerType.Circle };
+            MainSeries = new LineSeries { MarkerType = MarkerType.None };
             // Add the series to the plot model
             tmp.Series.Add(MainSeries);
             // Axes are created automatically if they are not defined
@@ -113,25 +109,27 @@ namespace LDC1000ProximityPlot
         }
 
         bool start = false;
-
         /// <summary>
-        /// Opens a connection on the serial port andstarts the timer. Timer will need tweaking
+        /// Opens a connection on the serial port and starts polling. Clicking again closes connection and thread.
         /// </summary>
         public void ConnectSensor()
         {
-            start = true;
-            evm = new SerialPort("COM12", 9600);
-            evm.Open();
-
-            Thread timerThread = new Thread(new ParameterizedThreadStart(OnTimerElapsed));
-            timerThread.Start();
+            start = !start;
+            if(evm == null) evm = new SerialPort("COM12", 9600);
             
 
-            //this.MainTimer = new System.Threading.Timer(OnTimerElapsed);
+            Thread timerThread = new Thread(new ParameterizedThreadStart(OnTimerElapsed));
 
-            //long delta = 1;
-            //this.watch.Start();
-            //this.MainTimer.Change(10000, delta);
+            if (start)
+            {
+                evm.Open();
+                timerThread.Start();
+            }
+            else
+            {
+                evm.Close();
+                timerThread.Abort();
+            }
         }
 
         private void ProxRetrieveTask()
@@ -143,26 +141,34 @@ namespace LDC1000ProximityPlot
                     evm.Write("1");
                     dataLength = evm.BytesToRead;
 
-                    data = new byte[dataLength];
                     while (evm.BytesToRead > 0)
                     {
                         if (i == dataLength) break;
-                        data[i] = (byte)evm.ReadByte();
+                        switch(i)
+                        {
+                            case 2:
+                                data[0] = (byte)evm.ReadByte();
+                                break;
+                            case 3:
+                                data[1] = (byte)evm.ReadByte();
+                                break;
+                            case 4:
+                                data[2] = (byte)evm.ReadByte();
+                                break;
+                            case 5:
+                                data[3] = (byte)evm.ReadByte();
+                                break;
+                            default:
+                                evm.ReadByte(); 
+                                break;
+                        }
                         i++;
                     }
-
                     i = 0;
 
-                    if (data.Length >= 7)
-                    {
-                        byte[] evmReturn = new byte[] { data[2], data[3], data[4], data[5] };
-
-                        string hexFromASCII = System.Text.Encoding.ASCII.GetString(evmReturn);
-                        int proximity = int.Parse(hexFromASCII, System.Globalization.NumberStyles.AllowHexSpecifier);
-                        return proximity;
-
-                    }
-                    return -1;
+                    string hexFromASCII = System.Text.Encoding.ASCII.GetString(data);
+                    int proximity = int.Parse(hexFromASCII, System.Globalization.NumberStyles.AllowHexSpecifier);
+                    return proximity;
                 }
                 catch (Exception ex)
                 {
