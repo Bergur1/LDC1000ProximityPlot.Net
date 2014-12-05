@@ -8,7 +8,7 @@
         <prox:MainViewModel />
     </Window.DataContext>
     <Grid>
-        <Button Content="Button" Command="{Binding Path=ReadCommand}" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Width="75"/>
+        <Button Content="{Binding Path=ProxyButtonText}" Command="{Binding Path=ReadCommand}" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Width="75"/>
         <oxy:PlotView Model="{Binding Model}" Margin="0,37,0,0" />
     </Grid>
 </Window>
