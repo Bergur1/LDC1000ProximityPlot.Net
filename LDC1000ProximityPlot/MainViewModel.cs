@@ -18,6 +18,9 @@ namespace LDC1000ProximityPlot
     using System.Threading.Tasks;
     using System.Windows.Input;
     using System.IO.Ports;
+    using FFTWSharp;
+    using System.Runtime.InteropServices;
+
    
     /// <summary>
     /// Represents the view-model for the main window.
@@ -25,16 +28,22 @@ namespace LDC1000ProximityPlot
     public class MainViewModel: INotifyPropertyChanged
     {
         //some of these shouldn't be global...reorganize
-
-        private ICommand _readCommand;
-           
+        #region globalVars
+        private ICommand _readCommand;         
         int Proximity;
         int dataLength;
         byte[] data = new byte[4];
         int readByteCounter = 0;
+        int n = 1024;
+        IntPtr pin, pout;
+        IntPtr fplan;
+        int[] fin, fout;
+        #endregion
 
         LineSeries MainSeries { get; set; }
         public SerialPort evm { get; set; }
+
+        #region UIRelated
         public ICommand ReadCommand
         {
             get
@@ -70,6 +79,8 @@ namespace LDC1000ProximityPlot
                 RaisePropertyChanged("ProxyButtonText");
             }
         }
+        #endregion
+
         /// <summary>
         /// Initializes a new instance of the <see cref="MainViewModel" /> class.
         /// </summary>
@@ -82,49 +93,56 @@ namespace LDC1000ProximityPlot
             // Add the series to the plot model
             tmp.Series.Add(MainSeries);
             // Axes are created automatically if they are not defined
-            //OxyPlot.Axes.LinearAxis yAxis = new OxyPlot.Axes.LinearAxis();
-            ////yAxis.AbsoluteMaximum = 32000;
-            //yAxis.Maximum = 32000;
-            ////yAxis.AbsoluteMinimum = 1000;
-            //yAxis.Minimum = 10000;
-            //yAxis.Position = OxyPlot.Axes.AxisPosition.Left;
-
-            //tmp.Axes.Add(yAxis);
 
             // Set the Model property, the INotifyPropertyChanged event will make the WPF Plot control update its content
             this.Model = tmp;
+            FFTWInit();
+        }
+
+        private void FFTWInit()
+        {
+            // create two unmanaged arrays, properly aligned
+            pin = fftwf.malloc(n * 8);
+            pout = fftwf.malloc(n * 8);
+
+            // create two managed arrays, possibly misalinged
+            // n*2 because we are dealing with complex numbers
+            fin = new int[n * 2];
+            fout = new int[n * 2];
+
+            GCHandle hin, hout;
+
+            // get handles and pin arrays so the GC doesn't move them
+            hin = GCHandle.Alloc(fin, GCHandleType.Pinned);
+            hout = GCHandle.Alloc(fout, GCHandleType.Pinned);
+
+            fplan = fftw.dft_1d(n, hin.AddrOfPinnedObject(), hout.AddrOfPinnedObject(), fftw_direction.Forward, fftw_flags.Estimate);
+
+            // copy managed arrays to unmanaged arrays
+            Marshal.Copy(fin, 0, pin, n * 2);
+            Marshal.Copy(fout, 0, pout, n * 2);
         }
 
         int FFTSampleSize = 1024; 
         private void OnTimerElapsed(object state)
         {
-            //rotating buffer for moving average
-            //todo: delay response by 1 and center the window
-            int i = 0;
-            int[] avgArray = new int[3];
-
             //total number of samples
+            //todo retrieve sample frequency
             int count = 0;
+
+            int sampleTick;
 
             while (start)
             {
                 try
                 {
+                    sampleTick = System.Environment.TickCount; 
+                    ProxRetrieveTask();
+                    Console.WriteLine("Time per poll: {0} us",
+                        (System.Environment.TickCount - sampleTick));
+
                     if (Proximity > 24000)
                     {
-                        ///moving average smoothing
-                        if (count < 3)
-                        {
-                            avgArray[count] = Proximity;
-                        }
-                        else
-                        {
-                            avgArray[i] = Proximity;
-                            Proximity = (avgArray[0] + avgArray[1] + avgArray[2]) / 3;
-                            if (i == 2) i = 0;
-                            i++;
-                        }
-
                         //update the graph
                         lock (this.Model.SyncRoot)
                         {
@@ -136,8 +154,7 @@ namespace LDC1000ProximityPlot
                                 this.Model.Axes[0].Minimum = MainSeries.Points[0].X;
                             }
                         }
-                        this.Model.InvalidatePlot(true);
-                        ProxRetrieveTask();
+                        this.Model.InvalidatePlot(true); 
                     }
                     
                 }
@@ -229,5 +246,6 @@ namespace LDC1000ProximityPlot
         /// Gets the plot model.
         /// </summary>
         public PlotModel Model { get; private set; }
+
     }
 }
