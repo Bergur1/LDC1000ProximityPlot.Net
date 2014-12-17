@@ -23,6 +23,7 @@ namespace LDC1000ProximityPlot
         public MainWindow()
         {
             InitializeComponent();
+            
         }
     }
 }

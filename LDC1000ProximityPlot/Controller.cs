@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,7 +10,12 @@ using System.Threading;
 using System.Windows.Input;
 using OxyPlot;
 using OxyPlot.Series;
+using System.Windows.Controls;
+using System.Windows.Shapes;
+using System.Windows.Media;
+using System.Windows;
 using Exocortex;
+
 
 namespace LDC1000ProximityPlot
 {
@@ -18,6 +24,7 @@ namespace LDC1000ProximityPlot
         ProximityReaderThread pollingThread;
 
         #region constructor stuff
+        public ObservableCollection<CanvasItem> CanvasItems { get; set; }
         public PlotModel Model { get; private set; }
         LineSeries MainSeries { get; set; }
         public Controller()
@@ -33,6 +40,10 @@ namespace LDC1000ProximityPlot
             // Set the Model property, the INotifyPropertyChanged event will make the WPF Plot control update its content
             this.Model = tmp;
             FFTSampleSize = 1024;
+            CanvasItems = new ObservableCollection<CanvasItem> { };
+
+            
+
         }
         #endregion
 
@@ -129,18 +140,34 @@ namespace LDC1000ProximityPlot
 
         private void FFT()
         {
-            var vector = pollingThread.SegmentOfProximities(FFTSampleSize);
-            //probably unnessecary
-            int vectorLength = vector.Count;
-            Exocortex.DSP.ComplexF[] complexData = new Exocortex.DSP.ComplexF[vectorLength];
+            GraphWave();
+            //var vector = pollingThread.SegmentOfProximities(FFTSampleSize);
+            ////probably unnessecary
+            //int vectorLength = vector.Count;
+            //Exocortex.DSP.ComplexF[] complexData = new Exocortex.DSP.ComplexF[vectorLength];
 
-            for (int i = 0; i < vectorLength; ++i)
-            {
-                complexData[i].Re = vector.ElementAt(i); // Add your real part here
-                //    complexData[i].Im = 2; // Add your imaginary part here
-            }
+            //for (int i = 0; i < vectorLength; ++i)
+            //{
+            //    complexData[i].Re = vector.ElementAt(i); // Add your real part here
+            //    //    complexData[i].Im = 2; // Add your imaginary part here
+            //}
 
-            Exocortex.DSP.Fourier.FFT(complexData, Exocortex.DSP.FourierDirection.Forward);
+            //Exocortex.DSP.Fourier.FFT(complexData, Exocortex.DSP.FourierDirection.Forward);
+        }
+
+        public Canvas testCanvas { get; set; }
+
+        private void GraphWave()
+        {
+            CanvasItem test = new CanvasItem();
+            
+            test.X = 10;
+            test.Y = 10;
+
+            test.Points = new Point(30,30);
+ 
+            CanvasItems.Add( test);
+
         }
     }
 }

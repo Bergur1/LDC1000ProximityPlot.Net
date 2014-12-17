@@ -3,13 +3,31 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:oxy="clr-namespace:OxyPlot.Wpf;assembly=OxyPlot.Wpf"
         xmlns:prox="clr-namespace:LDC1000ProximityPlot"
-        Title="MainWindow" Height="350" Width="525">
+        Title="MainWindow" Height="655" Width="1351.8">
     <Window.DataContext>
         <prox:Controller />
     </Window.DataContext>
     <Grid>
         <Button Content="{Binding Path=ProxyButtonText}" Command="{Binding Path=ReadCommand}" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Width="75" Height="22"/>
-        <oxy:PlotView Model="{Binding Model}" Margin="0,37,0,0" />
+        <oxy:PlotView Model="{Binding Model}" Margin="0,289,0,0" />
         <Button Content="FFT" Command="{Binding ExecuteFFTCommand}" HorizontalAlignment="Left" Margin="90,10,0,0" VerticalAlignment="Top" Width="75" Height="22"/>
+        <ItemsControl ItemsSource="{Binding Path=CanvasItems}" Margin="10,10,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <Canvas/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemContainerStyle>
+                <Style TargetType="ContentPresenter">
+                    <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                    <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                </Style>
+            </ItemsControl.ItemContainerStyle>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Polyline Stroke="Black" StrokeThickness="1" Points="{Binding Points}"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
     </Grid>
 </Window>
