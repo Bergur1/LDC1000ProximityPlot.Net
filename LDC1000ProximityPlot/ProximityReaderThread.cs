@@ -1,11 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Windows;
 using System.Threading;
 using System.IO.Ports;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace LDC1000ProximityPlot
 {
@@ -16,7 +14,12 @@ namespace LDC1000ProximityPlot
         private int dataLength;
         private int readByteCounter = 0;
         private byte[] data = new byte[4];
-        private int fftBinSize = 1024;
+        public int fftBinSize;
+        private bool running = false;
+
+        public string ComPort { get; set; }
+
+        public long TimeElapsed { get; set; }
 
         //stores proximity data
         private float[] dataProx = new float[1024000];
@@ -46,34 +49,51 @@ namespace LDC1000ProximityPlot
             proxQueue.TryDequeue(out proximity);
         }
 
-        public ProximityReaderThread()
+        public ProximityReaderThread(string comPort, int binSize)
         {
-            evm = new SerialPort("COM12", 115200); 
+            evm = new SerialPort(comPort, 115200); 
             t = new Thread(PollProximity);
             DataCounter = 0;
+            fftBinSize = binSize;
         }
 
         public void Start() 
         {
-            evm.Open();
-            t.Priority = ThreadPriority.AboveNormal;
-            t.Start(); 
+            try
+            {
+                evm.Open();
+                t.Priority = ThreadPriority.AboveNormal;
+                t.Start();
+                running = true;
+            }
+            catch(Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
         }
         public void Stop() 
         {
-            evm.Close();
-            t.Abort(); 
+            try
+            {
+                running = false;
+                evm.Close();
+                t.Join();
+            }
+            catch(Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
         }
-
-        // note: this event is fired in the background thread
-        //public event EventHandler<DataEventArgs> DataReceived;
 
         private bool closed = false;
         public void Close() { closed = true; }
 
+        
+
         private void PollProximity()
         {
-            while (true)
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            while (running)
             {
                 try
                 {
@@ -106,15 +126,27 @@ namespace LDC1000ProximityPlot
                     readByteCounter = 0;
 
                     string hexFromASCII = System.Text.Encoding.ASCII.GetString(data);
-                    if (DataCounter >= dataProx.Length) DataCounter = 0;
+                    if (DataCounter % fftBinSize == 0)
+                    {
+                        TimeElapsed = stopwatch.ElapsedMilliseconds;
+                        stopwatch.Reset();
+                    }
+                    
+                    //maybe change to using int instead
                     dataProx[DataCounter] = (float)int.Parse(hexFromASCII, System.Globalization.NumberStyles.AllowHexSpecifier);
                     DataCounter++;
+                    if (DataCounter == dataProx.Length -1)
+                    {
+                        DataCounter = 0;
+                    }
+
+                    
 
                     //proxQueue.Enqueue(double.Parse(hexFromASCII, System.Globalization.NumberStyles.AllowHexSpecifier));
                 }
                 catch (Exception ex)
                 {
-                    //do nothing...yet
+                    MessageBox.Show(ex.Message);
                 }
             }
         }
